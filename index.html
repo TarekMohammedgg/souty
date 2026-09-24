@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>صوتي | Souty</title>
+  <link rel="icon" href="src/assets/icon.svg">
+  <link rel="stylesheet" href="src/css/fonts.css">
+  <link rel="stylesheet" href="src/css/style.css">
+</head>
+<body>
+  <div class="app-container">
+
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-section">
+        <img class="app-logo" src="src/assets/icon.svg" alt="" width="46" height="46">
+        <div class="logo-text">
+          <h1>صوتي</h1>
+          <p>اتكلم، وصوتي يكتب مكانك في أي برنامج</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <div class="mode-switch" role="radiogroup" aria-label="طريقة الكتابة">
+          <button class="mode-option" role="radio" data-mode="default" title="يكتب كلامك زي ما قلته">تفريغ</button>
+          <button class="mode-option" role="radio" data-mode="prompt" title="يحوّل كلامك لـ prompt إنجليزي واضح للـ AI" dir="ltr">AI Prompt</button>
+        </div>
+        <span class="hotkey-badge" title="اختصار الشريط العائم في أي مكان بالويندوز">Ctrl + Space</span>
+        <button id="btn-settings" class="btn-icon-subtle" title="الإعدادات">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+          </svg>
+          <span>الإعدادات</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Recorder -->
+    <main class="glass-card recording-card">
+      <div class="visualizer-wrapper">
+        <canvas id="visualizer-canvas"></canvas>
+      </div>
+
+      <div class="status-timer-row">
+        <div id="timer-display" class="timer-display">00:00</div>
+        <div class="status-badge">
+          <span id="status-dot" class="status-dot idle"></span>
+          <span id="status-text">جاهز للتسجيل</span>
+        </div>
+      </div>
+
+      <div class="controls-row">
+        <button id="btn-cancel" class="btn-secondary" title="إلغاء التسجيل" disabled>
+          <svg viewBox="0 0 24 24">
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+          </svg>
+        </button>
+
+        <button id="btn-record-toggle" class="btn-record" title="بدء التسجيل">
+          <svg id="icon-mic" viewBox="0 0 24 24">
+            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+          </svg>
+          <svg id="icon-stop" viewBox="0 0 24 24" style="display: none;">
+            <path d="M6 6h12v12H6z"/>
+          </svg>
+        </button>
+
+        <button id="btn-pause-toggle" class="btn-secondary" title="إيقاف مؤقت" disabled>
+          <svg id="icon-pause" viewBox="0 0 24 24">
+            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+          </svg>
+          <svg id="icon-resume" viewBox="0 0 24 24" style="display: none;">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+        </button>
+      </div>
+    </main>
+
+    <!-- History: one card per transcription -->
+    <section class="history-section">
+      <div class="history-section-header">
+        <h2>السجل</h2>
+        <button id="btn-clear-history" class="btn-action btn-danger-text" hidden>مسح الكل</button>
+      </div>
+      <div id="history-list" class="history-list"></div>
+    </section>
+
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>الإعدادات</h3>
+        <button id="btn-close-settings" class="btn-close-modal" title="إغلاق">&times;</button>
+      </div>
+
+      <div class="form-group">
+        <label for="input-api-key">OpenRouter API Key</label>
+        <div class="input-with-button">
+          <input type="password" id="input-api-key" class="form-control" placeholder="sk-or-v1-..." dir="ltr">
+          <button id="btn-toggle-key-visibility" class="btn-secondary btn-key-toggle" type="button" title="إظهار / إخفاء المفتاح">
+            <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+          </button>
+        </div>
+        <p class="form-hint">احصل على مفتاحك من <a href="#" id="link-openrouter">openrouter.ai/keys</a></p>
+      </div>
+
+      <div class="form-group">
+        <label for="select-model">Model</label>
+        <select id="select-model" class="form-control" dir="ltr">
+          <option value="google/gemini-2.5-flash-lite" selected>Gemini 2.5 Flash Lite</option>
+          <option value="google/gemini-2.5-flash">Gemini 2.5 Flash</option>
+        </select>
+      </div>
+
+      <div class="form-group form-group-inline">
+        <label for="check-auto-copy">نسخ النص تلقائياً بعد التفريغ</label>
+        <input type="checkbox" id="check-auto-copy" checked>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btn-save-settings" class="btn-primary">حفظ</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="src/js/audio-converter.js"></script>
+  <script src="src/js/audio-recorder.js"></script>
+  <script src="src/js/ui-controller.js"></script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Souty Whisper Flow</title>
+  <link rel="stylesheet" href="src/css/fonts.css">
+  <link rel="stylesheet" href="src/css/overlay.css">
+</head>
+<body>
+
+  <div class="floating-pill" id="floating-pill">
+    <!-- Status indicator, timer, active mode -->
+    <div class="pill-left">
+      <div id="record-indicator" class="record-indicator"></div>
+      <span id="timer-text" class="timer-text">00:00</span>
+      <button id="mode-chip" class="mode-chip" title="اضغط للتبديل بين التفريغ و AI Prompt">
+        <span id="mode-chip-label" dir="auto"></span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11l-3-3 1.4-1.4L21.8 8l-5.4 5.4L15 12l3-3H7V7zm10 10H6l3 3-1.4 1.4L2.2 16l5.4-5.4L9 12l-3 3h11v2z"/></svg>
+      </button>
+    </div>
+
+    <!-- Waveform or status message -->
+    <div class="pill-center">
+      <canvas id="overlay-canvas"></canvas>
+      <div id="overlay-status" class="overlay-status"></div>
+    </div>
+
+    <!-- Pause/Resume + Cancel. Finishing is Ctrl + Space. -->
+    <div class="pill-right">
+      <button id="btn-overlay-pause" class="pill-btn pill-btn-pause" title="إيقاف مؤقت" aria-label="إيقاف مؤقت">
+        <svg id="icon-pause" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+        <svg id="icon-resume" viewBox="0 0 24 24" style="display: none;"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+
+      <button id="btn-overlay-cancel" class="pill-btn" title="إلغاء (Esc)" aria-label="إلغاء">
+        <svg viewBox="0 0 24 24">
+          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <script src="src/js/audio-converter.js"></script>
+  <script src="src/js/audio-recorder.js"></script>
+  <script src="src/js/overlay-controller.js"></script>
+</body>
+</html>

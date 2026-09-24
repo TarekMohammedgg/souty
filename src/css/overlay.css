@@ -1,0 +1,219 @@
+/* ==========================================================================
+   Floating Pill Overlay - Wispr Flow style: compact ink pill, cream waveform
+   ========================================================================== */
+
+:root {
+  --ink: #1A1A1A;
+  --cream: #FFFFEB;
+  --lavender: #F0D7FF;
+  --coral: #FF6C4C;
+  --orange: #FFA946;
+  --green: #3FBF9A; /* lifted forest green, readable on ink */
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  background: transparent;
+  overflow: hidden;
+  font-family: 'Figtree', 'IBM Plex Sans Arabic', 'Segoe UI', system-ui, sans-serif;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.floating-pill {
+  width: 360px;
+  height: 52px;
+  background: var(--ink);
+  border: 1px solid rgba(255, 255, 235, 0.12);
+  border-radius: 9999px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px 0 14px;
+  color: var(--cream);
+}
+
+.pill-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.record-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--coral);
+  animation: pulse-red 1.2s infinite ease-in-out;
+}
+
+.record-indicator.starting {
+  background: rgba(255, 255, 235, 0.35);
+  animation: none;
+}
+
+.record-indicator.paused {
+  background: var(--orange);
+  animation: none;
+}
+
+.record-indicator.processing {
+  background: var(--orange);
+  animation: spin-pulse 0.8s infinite;
+}
+
+.record-indicator.done {
+  background: var(--green);
+  animation: none;
+}
+
+.timer-text {
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.3px;
+  color: var(--cream);
+}
+
+.mode-chip {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--cream);
+  background: rgba(255, 255, 235, 0.14);
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.mode-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.mode-chip svg {
+  width: 11px;
+  height: 11px;
+  fill: currentColor;
+  opacity: 0.6;
+}
+
+.mode-chip:hover:not(:disabled) {
+  background: rgba(255, 255, 235, 0.24);
+}
+
+.mode-chip:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.mode-chip:focus-visible {
+  outline: 2px solid var(--lavender);
+  outline-offset: 1px;
+}
+
+/* AI Prompt stands out so it's never mistaken for plain dictation */
+.mode-chip[data-mode="prompt"] {
+  color: var(--ink);
+  background: var(--lavender);
+}
+
+.mode-chip[data-mode="prompt"]:hover:not(:disabled) {
+  background: #E6C2FB;
+}
+
+.pill-center {
+  flex: 1;
+  height: 28px;
+  margin: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+#overlay-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  color: var(--cream); /* waveform bar color (read by AudioRecorder) */
+}
+
+.overlay-status {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cream);
+  display: none;
+  text-align: center;
+}
+
+.pill-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pill-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 235, 0.1);
+  color: var(--cream);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  outline: none;
+  transition: background 0.18s ease;
+}
+
+.pill-btn:hover {
+  background: rgba(255, 255, 235, 0.2);
+}
+
+.pill-btn:focus-visible {
+  outline: 2px solid var(--lavender);
+  outline-offset: 1px;
+}
+
+.pill-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pill-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+/* Animations */
+@keyframes pulse-red {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.25); opacity: 0.7; }
+}
+
+@keyframes spin-pulse {
+  0% { transform: scale(0.9); opacity: 0.6; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.6; }
+}

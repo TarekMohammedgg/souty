@@ -1,0 +1,63 @@
+{
+  "name": "souty-audio-transcriber",
+  "productName": "Souty",
+  "version": "1.0.0",
+  "description": "Voice-first writing for Windows: speak in Arabic or English and Souty types it wherever your cursor is.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --enable-logging",
+    "dist": "electron-builder --win nsis"
+  },
+  "keywords": [
+    "electron",
+    "speech-to-text",
+    "transcription",
+    "openrouter",
+    "arabic",
+    "english"
+  ],
+  "author": "Souty Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "34.5.8",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.souty.app",
+    "productName": "Souty",
+    "copyright": "Copyright © 2026 Souty",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "preload-overlay.js",
+      "index.html",
+      "overlay.html",
+      "src/**/*",
+      "hotkey-hook.exe",
+      "win-helper.exe"
+    ],
+    "asarUnpack": [
+      "hotkey-hook.exe",
+      "win-helper.exe"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "src/assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Souty",
+      "installerIcon": "src/assets/icon.ico",
+      "uninstallerIcon": "src/assets/icon.ico",
+      "artifactName": "Souty-Setup-${version}.${ext}"
+    }
+  }
+}
