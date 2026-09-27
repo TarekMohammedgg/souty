@@ -11,6 +11,8 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 </div>
 
+https://github.com/user-attachments/assets/2f095a5d-b1cd-4da1-b76a-77f55cdce375
+
 ---
 
 Press **`Ctrl + Space`** from anywhere on Windows — a floating pill appears, you speak, and when you press **`Ctrl + Space`** again the transcribed text is automatically pasted into whatever window you were using.
