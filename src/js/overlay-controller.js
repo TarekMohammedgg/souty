@@ -4,7 +4,12 @@
  */
 
 // Same names as the mode switch in the main window
-const MODE_LABELS = { default: 'تفريغ', prompt: 'AI Prompt' };
+const MODE_LABELS = { default: 'تفريغ', translate: 'ترجمة' };
+// Short target-language tag for the chip, keyed by the settings value (fallback: first two letters)
+const LANG_TAGS = {
+  'English': 'EN', 'Modern Standard Arabic': 'AR', 'French': 'FR', 'German': 'DE', 'Spanish': 'ES', 'Italian': 'IT',
+  'Portuguese': 'PT', 'Turkish': 'TR', 'Russian': 'RU', 'Chinese (Simplified)': 'ZH', 'Japanese': 'JA', 'Korean': 'KO'
+};
 
 document.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('overlay-canvas');
@@ -13,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const overlayStatus = document.getElementById('overlay-status');
   const modeChip = document.getElementById('mode-chip');
   const modeChipLabel = document.getElementById('mode-chip-label');
+  const pill = document.getElementById('floating-pill');
   const btnPause = document.getElementById('btn-overlay-pause');
   const iconPause = document.getElementById('icon-pause');
   const iconResume = document.getElementById('icon-resume');
@@ -34,23 +40,29 @@ document.addEventListener('DOMContentLoaded', () => {
   let isProcessing = false;
   let safetyTimeout = null;
   let currentMode = 'default';
+  let targetLanguage = 'English';
 
+  // Status messages take the timer + chip space so they fit on one line
   function showStatus(text) {
-    canvas.style.display = 'none';
-    overlayStatus.style.display = 'block';
+    pill.classList.add('has-status');
     overlayStatus.textContent = text;
+    overlayStatus.title = text;
   }
 
   function showMode(mode) {
     currentMode = MODE_LABELS[mode] ? mode : 'default';
-    modeChipLabel.textContent = MODE_LABELS[currentMode];
+    const tag = LANG_TAGS[targetLanguage] || targetLanguage.slice(0, 2).toUpperCase();
+    modeChipLabel.textContent = currentMode === 'translate' ? `${MODE_LABELS.translate} ${tag}` : MODE_LABELS[currentMode];
+    modeChip.title = currentMode === 'translate'
+      ? `ترجمة إلى ${targetLanguage} — اضغط للتبديل للتفريغ`
+      : 'اضغط للتبديل للترجمة';
     modeChip.dataset.mode = currentMode;
   }
 
   // The mode is read when the recording is sent, so switching mid-recording applies to it
   async function toggleMode() {
     if (isProcessing) return;
-    const next = currentMode === 'prompt' ? 'default' : 'prompt';
+    const next = currentMode === 'translate' ? 'default' : 'translate';
     showMode(next); // instant feedback
     showMode(await window.overlayAPI.setMode(next));
   }
@@ -64,17 +76,17 @@ document.addEventListener('DOMContentLoaded', () => {
     clearTimeout(safetyTimeout);
 
     const settings = await window.overlayAPI.getSettings();
+    targetLanguage = settings.targetLanguage || 'English';
     showMode(settings.mode);
 
     if (!settings.apiKey) {
-      showStatus('أضف مفتاح OpenRouter من الإعدادات');
+      showStatus('أضف مفتاح API من الإعدادات');
       hideLater(2500);
       return;
     }
 
     timerText.textContent = '00:00';
-    canvas.style.display = 'block';
-    overlayStatus.style.display = 'none';
+    pill.classList.remove('has-status');
     // Grey until the mic is actually capturing (~40ms, ~400ms on first use); the recorder's
     // 'recording' state turns it red, so people don't start talking before audio is recorded
     recordIndicator.className = 'record-indicator starting';
@@ -101,7 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btnPause.disabled = true;
     modeChip.disabled = true;
     recordIndicator.className = 'record-indicator processing';
-    showStatus(currentMode === 'prompt' ? 'جاري كتابة الـ prompt...' : 'جاري التفريغ...');
+    showStatus(currentMode === 'translate' ? 'جاري الترجمة...' : 'جاري التفريغ...');
 
     safetyTimeout = setTimeout(() => {
       if (isProcessing) {

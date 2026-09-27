@@ -1,0 +1,22 @@
+{
+  "_about": "TTS test set for transcription accuracy. 'say' is what the Hoda (ar-EG) voice speaks: English terms are spelled the way Egyptians pronounce them. '|' = pause mid-sentence (must NOT end the sentence), '||' = pause between sentences. 'ref' is the correct transcript, 'terms' the English words that must come out in Latin letters.",
+  "clips": [
+    { "id": "g01", "say": "النهاردة هنتكلم عن ازاي نحول ال ديوكرايزيشن | الى ايمج", "ref": "النهاردة هنتكلم عن ازاي نحول ال Dockerization الى image", "terms": ["Dockerization", "image"] },
+    { "id": "g02", "say": "النهارده هنتكلم عن الدوكر و ازاي نقدر نعمل ديوكرايزيشن للكونتينر بتاعنا", "ref": "النهارده هنتكلم عن ال Docker وازاي نقدر نعمل Dockerization لل container بتاعنا", "terms": ["Docker", "Dockerization", "container"] },
+    { "id": "g03", "say": "بكرة الصبح لازم نخلص الإيه بي آي بتاعة اللوجين، وبعدين نعمل ديبلوي على الستيجنج", "ref": "بكرة الصبح لازم نخلص ال API بتاعة ال login وبعدين نعمل deploy على ال staging", "terms": ["API", "login", "deploy", "staging"] },
+    { "id": "g04", "say": "انا مش فاهم ليه الموضوع ده واخد وقت كتير كده، احنا قلنا هنخلصه امبارح", "ref": "انا مش فاهم ليه الموضوع ده واخد وقت كتير كده احنا قلنا هنخلصه امبارح", "terms": [] },
+    { "id": "g05", "say": "هو احنا ممكن نستخدم ريدِس بدل الداتابيز في الحتة دي ولا لأ؟", "ref": "هو احنا ممكن نستخدم Redis بدل ال database في الحتة دي ولا لا", "terms": ["Redis", "database"] },
+    { "id": "g06", "say": "لازم نعمل ريستارت للكونتينر | قبل ما نعمل ديبلوي، وبعدين نشوف اللوجز في الداشبورد", "ref": "لازم نعمل restart لل container قبل ما نعمل deploy وبعدين نشوف ال logs في ال dashboard", "terms": ["restart", "container", "deploy", "logs", "dashboard"] },
+    { "id": "g07", "say": "عايز اعمل بول ريكويست جديد و اضيف فيه التيستس بتاعة الباك إند", "ref": "عايز اعمل pull request جديد واضيف فيه ال tests بتاعة ال backend", "terms": ["pull request", "tests", "backend"] },
+    { "id": "g08", "say": "الفرونت إند مكتوب ب ريأكت و تايب سكريبت، والباك إند ب نود", "ref": "ال frontend مكتوب ب React و TypeScript وال backend ب Node", "terms": ["frontend", "React", "TypeScript", "backend", "Node"] },
+    { "id": "g09", "say": "انا كنت عايز | امم | اعرف ازاي نعمل كاش للريسبونس بتاع الإيه بي آي", "ref": "انا كنت عايز اعرف ازاي نعمل cache لل response بتاع ال API", "terms": ["cache", "response", "API"] },
+    { "id": "g10", "say": "the build is failing on the pipeline, can you check the logs please", "ref": "the build is failing on the pipeline can you check the logs please", "terms": ["build", "pipeline", "logs"], "lang": "en" },
+    { "id": "g11", "say": "ابعتلي اللينك بتاع الميتنج على الواتساب قبل الساعة تلاتة", "ref": "ابعتلي ال link بتاع ال meeting على ال WhatsApp قبل الساعة تلاتة", "terms": ["link", "meeting", "WhatsApp"] },
+    { "id": "g12", "say": "محتاجين نغير الكونفيج بتاع الإنجن إكس عشان الدومين الجديد يشتغل", "ref": "محتاجين نغير ال config بتاع ال nginx عشان ال domain الجديد يشتغل", "terms": ["config", "nginx", "domain"] },
+    { "id": "g13", "say": "بص يا أحمد، احنا محتاجين نخلص الفيتشر بتاعة النوتيفيكيشنز الاسبوع ده || الفكرة ان اليوزر لما يعمل اوردر جديد | يوصله نوتيفيكيشن على الموبايل || وكمان عايزين نسجل كل ده في اللوجز عشان لو حصلت مشكلة نعرف نعمل ديباج", "ref": "بص يا احمد احنا محتاجين نخلص ال feature بتاعة ال notifications الاسبوع ده الفكرة ان ال user لما يعمل order جديد يوصله notification على ال mobile وكمان عايزين نسجل كل ده في ال logs عشان لو حصلت مشكلة نعرف نعمل debug", "terms": ["feature", "notifications", "user", "order", "notification", "mobile", "logs", "debug"], "sentences": 3 },
+    { "id": "g14", "say": "لو سمحت اعمل ريفاكتور للفانكشن دي و خليها ترجع بروميس", "ref": "لو سمحت اعمل refactor لل function دي وخليها ترجع promise", "terms": ["refactor", "function", "promise"], "rate": 1.25 },
+    { "id": "g15", "say": "خلاص ماشي، هكلمك بليل ونتفق على كل حاجة", "ref": "خلاص ماشي هكلمك بليل ونتفق على كل حاجة", "terms": [], "rate": 1.25 },
+    { "id": "g16", "say": "النهارده هنبدا نتكلم عن ازاي نقدر نعمل ديوكرايزيشن للإيمج بتاعنا", "ref": "النهارده هنبدا نتكلم عن ازاي نقدر نعمل Dockerization لل Image بتاعنا", "terms": ["Dockerization", "Image"] },
+    { "id": "g17", "say": "النهارده هنتكلم ازاي نقدر نحول الدوكر الي كونتينر قصدي إلى ايمج عشان نقدر نستخدمه فيما بعد", "ref": "النهارده هنتكلم ازاي نقدر نحول ال Docker الي Container قصدي الى image عشان نقدر نستخدمه فيما بعد", "terms": ["Docker", "Container", "image"] }
+  ]
+}

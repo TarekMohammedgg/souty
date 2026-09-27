@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   transcribeAudio: (params) => ipcRenderer.invoke('transcribe-audio', params),
+  copyText: (text) => ipcRenderer.invoke('copy-text', text),
   getSettings: () => ipcRenderer.invoke('get-app-settings'),
   saveSettings: (settings) => ipcRenderer.invoke('save-app-settings', settings),
   onSettingsChanged: (callback) => {

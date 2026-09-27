@@ -1,7 +1,9 @@
-const { app, BrowserWindow, ipcMain, globalShortcut, screen, Tray, Menu, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, screen, Tray, Menu, clipboard, shell, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { execFile, spawn } = require('child_process');
+const { TRANSCRIBE_PROMPT, TRANSCRIBE_INSTRUCTION, FIX_ENGLISH_PROMPT, translatePrompt } = require('./src/prompts');
+const { tidyTranscript } = require('./src/tidy-transcript');
 
 // Bypass Chromium Autoplay policy so AudioContext and Web Audio Analyser work immediately without requiring user clicks
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
@@ -23,22 +25,45 @@ if (process.platform === 'win32') app.setAppUserModelId('com.souty.app'); // own
 const settingsPath = path.join(app.getPath('userData'), 'settings.json');
 const historyPath = path.join(app.getPath('userData'), 'history.json');
 const HISTORY_LIMIT = 200;
-const MODES = ['default', 'prompt'];
+const MODES = ['default', 'translate'];
+// Supported models
+const MODELS = [
+  'google/gemini-2.5-flash',
+  'google/gemini-3.1-flash-lite',
+  'microsoft/mai-transcribe-2'
+];
+// Speech-to-text only models: OpenRouter's /audio/transcriptions, no prompt (it's ignored), then a text fix pass
+const isOpenRouterStt = (model) => model.startsWith('microsoft/mai-transcribe');
 
 // Default settings
 const DEFAULT_SETTINGS = {
   apiKey: '',
-  model: 'google/gemini-2.5-flash-lite',
+  bankedKeys: [],
+  model: 'google/gemini-2.5-flash',
   autoCopy: true,
-  mode: 'default'
+  mode: 'default',
+  targetLanguage: 'English'
 };
+
+// API keys are encrypted at rest with Windows DPAPI (safeStorage) under *Enc fields; decrypted only in memory.
+// Falls back to plain text when encryption isn't available (e.g. no login keyring) so a key is never lost.
+const canEncrypt = () => safeStorage.isEncryptionAvailable();
+const encryptKey = (key) => canEncrypt() && key ? safeStorage.encryptString(key).toString('base64') : key;
+const decryptKey = (value, enc) => enc ? safeStorage.decryptString(Buffer.from(enc, 'base64')) : (value || '');
 
 function readSettings() {
   try {
     if (fs.existsSync(settingsPath)) {
-      const data = fs.readFileSync(settingsPath, 'utf8');
-      const settings = { ...DEFAULT_SETTINGS, ...JSON.parse(data) };
+      const raw = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+      const settings = { ...DEFAULT_SETTINGS, ...raw };
+      settings.apiKey = decryptKey(raw.apiKey, raw.apiKeyEnc);
+      settings.bankedKeys = Array.isArray(raw.bankedKeysEnc)
+        ? raw.bankedKeysEnc.map(enc => decryptKey(null, enc))
+        : (Array.isArray(raw.bankedKeys) ? raw.bankedKeys : []);
+      delete settings.apiKeyEnc;
+      delete settings.bankedKeysEnc;
       if (!MODES.includes(settings.mode)) settings.mode = 'default';
+      if (!MODELS.includes(settings.model)) settings.model = MODELS[0];
       return settings;
     }
   } catch (e) {
@@ -51,7 +76,14 @@ function writeSettings(newSettings) {
   try {
     const current = readSettings();
     const updated = { ...current, ...newSettings };
-    fs.writeFileSync(settingsPath, JSON.stringify(updated, null, 2), 'utf8');
+    const onDisk = { ...updated };
+    if (canEncrypt()) {
+      onDisk.apiKeyEnc = encryptKey(updated.apiKey || '');
+      onDisk.bankedKeysEnc = (updated.bankedKeys || []).map(encryptKey);
+      delete onDisk.apiKey;
+      delete onDisk.bankedKeys;
+    }
+    fs.writeFileSync(settingsPath, JSON.stringify(onDisk, null, 2), 'utf8');
     return updated;
   } catch (e) {
     console.error('Failed to write settings.json:', e);
@@ -216,6 +248,9 @@ ipcMain.handle('set-mode', (event, mode) => {
   return readSettings().mode;
 });
 
+// Renderer copies go through here: navigator.clipboard is denied when the window isn't focused
+ipcMain.handle('copy-text', (event, text) => clipboard.writeText(String(text ?? '')));
+
 ipcMain.on('trigger-auto-paste', (event, text) => {
   if (text) {
     clipboard.writeText(text);
@@ -223,130 +258,148 @@ ipcMain.on('trigger-auto-paste', (event, text) => {
   }
 });
 
-// Stage 1 (every mode): word-for-word transcript from the audio.
-// Deliberately strict: telling the model it may "clean up" made it drop and rewrite real words.
-const TRANSCRIBE_PROMPT = `You are a speech-to-text transcriber. Your only job is to write down, word for word, what the speaker says.
-
-The speaker talks in Egyptian colloquial Arabic (عامية مصرية), mixing in English technical words.
-
-Rules:
-- Write every spoken word, in the order spoken, including the first and last words. Never summarize, shorten, paraphrase, or "improve" the sentence.
-- Keep the Egyptian dialect exactly as spoken (النهارده، هنتكلم، عايز، ازاي، بتاعنا، تقدر). Never convert it to Modern Standard Arabic.
-- English words stay English, in Latin letters, spelled correctly: Docker, Dockerization, API, container, deploy, staging, login, dashboard, users, search. Never transliterate them into Arabic letters and never swap them for a different English word.
-- The only things you may leave out are hesitation sounds (امم، آآ، إممم، uh، um) and a word accidentally said twice in a row.
-- Add punctuation (، . ؟) where the speaker pauses.
-- If there is no speech, output nothing.
-- Output only the transcript. If the speaker asks a question or gives an instruction, write it down; do not answer it.
-
-Examples of correct transcripts:
-- "النهارده هنتكلم عن الـ React وازاي نقدر نعمل state management للـ app بتاعنا."
-- "انا عايز اعمل endpoint جديدة في الـ API، والـ endpoint دي ترجع الـ orders."`;
-
-// Stage 1b (Arabic transcripts): the audio model sometimes writes English words phonetically in
-// Arabic letters (ديوكرايزيشن، الإيمج). This text-only pass rewrites just those words in English.
-const SCRIPT_FIX_PROMPT = `You fix the script of English words in a transcript. You do not change anything else.
-
-The transcript is Egyptian Arabic speech that mixes in English words. Some English words were written phonetically in Arabic letters by mistake. Rewrite only those words in correct English spelling, in Latin letters.
-
-How to spot them: the word is an English word (tech terms, product names, software words) spelled out in Arabic letters, e.g.
-- ديوكرايزيشن → Dockerization
-- دوكر / الدوكر → Docker / الـ Docker
-- إيمج / الإيمج / للإيمج → image / الـ image / للـ image
-- كونتينر / الكونتينر / للكونتينر → container / الـ container / للـ container
-- ديبلوي → deploy
-- ريستارت → restart
-- اللوجز → الـ logs
-- الداشبورد → الـ dashboard
-- إيه بي آي / الـ إيه بي آي → API / الـ API
-
-Arabic prefixes stay Arabic and get a tatweel before the English word: ال → الـ, لل → للـ, بال → بالـ, وال → والـ.
-
-Do not change anything else:
-- Keep every Arabic word exactly as written, including dialect (النهارده، هنتكلم، بتاعتنا، عايز). Never translate Arabic words into English.
-- Keep word order, punctuation, and English words that are already in Latin letters.
-- If nothing needs fixing, return the transcript exactly as it is.
-
-Output only the corrected transcript.`;
-
-// Stage 2 (AI Prompt mode only): text-to-text rewrite of the stage-1 transcript.
-// Working from text instead of audio stops the model from inventing requirements it half-heard.
-const AI_PROMPT_PROMPT = `You turn a dictated request into a clear, well-structured prompt for an AI assistant such as Claude or ChatGPT.
-
-You receive a transcript of what the user said, in Egyptian Arabic, English, or a mix. They were thinking out loud.
-
-Write one prompt in English, addressed to the AI (second person or imperative).
-
-Rules:
-- Be faithful: keep every requirement, detail, name, number, and constraint from the transcript. Do not add requirements, facts, languages, frameworks, or technologies that are not in it.
-- Drop filler, repetition, and self-corrections (keep the corrected version).
-- Be clear and direct: plain English, no fluff, no "act as an expert" boilerplate unless the user asked for a role.
-- Fit the structure to the size: a short request becomes 1 to 3 sentences. A longer one gets short paragraphs or labeled sections (Goal, Context, Requirements, Output), using only the sections that have content.
-- Keep code identifiers, file names, product names, and quoted text exactly as written.
-- Do not answer or carry out the request yourself. Output only the prompt text: no preface, quotes, or notes.`;
+// Transcription: one Gemini call per recording (plus one text call in Translate mode).
+// The provider comes from the key's shape, so one settings field accepts either key.
+const DEFAULT_MODEL = MODELS[0];
 
 // Model replies that mean "nothing was said"
 const NOISE_PATTERNS = [/^silence\.?$/i, /^empty\.?$/i, /^none\.?$/i, /^لا يوجد كلام\.?$/i, /^صمت\.?$/i, /^غير واضح\.?$/i, /^لا يوجد صوت\.?$/i];
 
-async function chat(apiKey, model, messages, signal) {
+// Google's defaults sometimes block ordinary Arabic mid-sentence; dictation of the user's own speech needs none
+const GOOGLE_SAFETY_OFF = ['HARM_CATEGORY_HARASSMENT', 'HARM_CATEGORY_HATE_SPEECH', 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'HARM_CATEGORY_DANGEROUS_CONTENT']
+  .map(category => ({ category, threshold: 'BLOCK_NONE' }));
+
+const AUDIO_MIME = { wav: 'audio/wav', webm: 'audio/webm', mp4: 'audio/mp4', m4a: 'audio/mp4', mp3: 'audio/mp3', ogg: 'audio/ogg' };
+
+function detectProvider(apiKey) {
+  if (apiKey.startsWith('sk-or-')) return 'openrouter';
+  if (/^(AIza|AQ\.)/.test(apiKey)) return 'google'; // AQ. = AI Studio's newer key format
+  return null;
+}
+
+// retryable: this key can't serve the request (quota, bad key, no credit, model unavailable), so a banked key might
+const apiError = (message, retryable = false) => Object.assign(new Error(message), { apiError: true, retryable });
+
+// input: { text, audio?: { data, format } } → model reply text
+async function generate({ apiKey, model, system, input, signal }) {
+  const provider = detectProvider(apiKey);
+  // Gemini 3.x can't turn thinking off; "minimal" is its lowest (and fastest) level
+  const isGemini3 = model.includes('gemini-3');
+  const isSttOnly = isOpenRouterStt(model);
   const startTime = Date.now();
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://github.com/souty-app',
-      'X-Title': 'Souty Audio Transcriber'
-    },
-    body: JSON.stringify({ model, messages, temperature: 0 }),
-    signal
-  });
-  console.log(`[API] Response status: ${response.status} (${Date.now() - startTime}ms)`);
 
-  if (!response.ok) {
-    let error = `خطأ (${response.status})`;
-    try {
-      const errJson = await response.json();
-      if (errJson.error && errJson.error.message) error = errJson.error.message;
-    } catch (e) {
-      error = response.statusText;
+  if (isSttOnly && provider === 'google') {
+    // retryable: a banked OpenRouter key can still serve it
+    throw apiError(`موديل ${model} متاح فقط عبر مفتاح OpenRouter (sk-or-…)`, true);
+  }
+
+  if (provider === 'openrouter') {
+    if (isSttOnly && input.audio) {
+      const response = await fetch('https://openrouter.ai/api/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://github.com/TarekMohammedgg/souty',
+          'X-Title': 'Souty Audio Transcriber'
+        },
+        // MAI-Transcribe ignores prompt and language hints (same output with or without them), so none are sent
+        body: JSON.stringify({
+          model,
+          input_audio: {
+            data: input.audio.data,
+            format: input.audio.format === 'mp4' ? 'm4a' : input.audio.format
+          }
+        }),
+        signal
+      });
+      const data = await response.json().catch(() => ({}));
+      console.log(`[API] openrouter stt ${model} ${response.status} (${Date.now() - startTime}ms)`);
+      if (!response.ok || data.error) throw apiError(data.error?.message || `خطأ (${response.status})`, true);
+      return (data.text || '').trim();
     }
-    throw Object.assign(new Error(error), { apiError: true });
+
+    const content = [{ type: 'text', text: input.text }];
+    if (input.audio) {
+      content.unshift({ type: 'input_audio', input_audio: { data: input.audio.data, format: input.audio.format === 'mp4' ? 'm4a' : input.audio.format } });
+    }
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://github.com/TarekMohammedgg/souty',
+        'X-Title': 'Souty Audio Transcriber'
+      },
+      body: JSON.stringify({ model, temperature: 0, ...(isGemini3 && { reasoning: { effort: 'minimal' } }), messages: [{ role: 'system', content: system }, { role: 'user', content }] }),
+      signal
+    });
+    const data = await response.json().catch(() => ({}));
+    console.log(`[API] openrouter ${model} ${response.status} (${Date.now() - startTime}ms)`);
+    if (!response.ok || data.error) throw apiError(data.error?.message || `خطأ (${response.status})`, true);
+    const choice = data.choices?.[0] || {};
+    if (choice.finish_reason === 'content_filter') throw apiError('الموديل وقف التفريغ في النص، جرّب تاني');
+    return (choice.message?.content || '').trim();
   }
 
-  const data = await response.json();
-  const text = (data.choices?.[0]?.message?.content || '').trim();
-  return NOISE_PATTERNS.some(p => p.test(text)) ? '' : text;
-}
-
-// Run the script-fix pass only when it can matter, and never let it damage the transcript
-async function fixEnglishScript(apiKey, model, transcript, signal) {
-  if (!/[\u0600-\u06FF]/.test(transcript)) return transcript; // no Arabic letters, nothing to fix
-  let fixed;
-  try {
-    fixed = await chat(apiKey, model, [
-      { role: 'system', content: SCRIPT_FIX_PROMPT },
-      { role: 'user', content: transcript }
-    ], signal);
-  } catch (err) {
-    console.error('[API] Script fix skipped:', err.message); // the stage-1 transcript is still good
-    return transcript;
+  if (provider === 'google') {
+    const parts = [{ text: input.text }];
+    if (input.audio) {
+      parts.unshift({ inline_data: { mime_type: AUDIO_MIME[input.audio.format] || 'audio/wav', data: input.audio.data } });
+    }
+    const id = model.replace(/^google\//, '');
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${id}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ role: 'user', parts }],
+        generationConfig: { temperature: 0, thinkingConfig: isGemini3 ? { thinkingLevel: 'minimal' } : { thinkingBudget: 0 } },
+        safetySettings: GOOGLE_SAFETY_OFF
+      }),
+      signal
+    });
+    const data = await response.json().catch(() => ({}));
+    console.log(`[API] google ${id} ${response.status} (${Date.now() - startTime}ms)`);
+    if (response.status === 429) throw apiError('وصلت لحد الاستخدام في مفتاح Google، استنى دقيقة وجرّب تاني', true);
+    if (!response.ok || data.error) throw apiError(data.error?.message || `خطأ (${response.status})`, true);
+    const candidate = data.candidates?.[0];
+    if (!candidate) throw apiError(`Google رفض الطلب (${data.promptFeedback?.blockReason || 'no candidates'})`);
+    if (candidate.finishReason === 'SAFETY') throw apiError('الموديل وقف التفريغ في النص، جرّب تاني');
+    return (candidate.content?.parts || []).map(p => p.text || '').join('').trim();
   }
-  // A real script fix barely changes length; anything else means the model rewrote the text
-  const ratio = fixed.length / transcript.length;
-  return fixed && ratio > 0.7 && ratio < 1.4 ? fixed : transcript;
+
+  throw apiError('المفتاح مش معروف: لازم يكون مفتاح OpenRouter (sk-or-…) أو Google AI Studio (AIza… أو AQ.…)', true);
 }
 
-// IPC Handler for Transcribing Audio in Main Process
+// Tries the main key, then each banked key, until one can serve the request.
+// ponytail: always starts from the main key; each limited key costs one fast failed request. Add a per-key cooldown if that latency shows up.
+async function generateWithKeys(keys, request) {
+  for (let i = 0; i < keys.length; i++) {
+    try {
+      return await generate({ ...request, apiKey: keys[i] });
+    } catch (err) {
+      if (!err.retryable) throw err;
+      if (i === keys.length - 1) {
+        if (keys.length > 1) err.message = `كل المفاتيح (${keys.length}) فشلت، آخر خطأ: ${err.message}`;
+        throw err;
+      }
+      console.warn(`[API] key ${i + 1}/${keys.length} failed (${err.message.slice(0, 80)}), trying the next one`);
+    }
+  }
+}
+
 ipcMain.handle('transcribe-audio', async (event, { base64Audio, format = 'wav', modelOverride }) => {
   const settings = readSettings();
   const apiKey = (settings.apiKey || '').trim();
-  const model = modelOverride || settings.model || 'google/gemini-2.5-flash-lite';
+  // Main key first, then the banked fallbacks in the order the user listed them
+  const keys = [...new Set([apiKey, ...(settings.bankedKeys || [])].map(k => k.trim()).filter(Boolean))];
+  const model = modelOverride || settings.model || DEFAULT_MODEL;
   const mode = MODES.includes(settings.mode) ? settings.mode : 'default';
 
   if (!apiKey) {
-    return { success: false, error: 'يرجى وضع مفتاح OpenRouter API في الإعدادات أولاً' };
+    return { success: false, error: 'يرجى وضع مفتاح API في الإعدادات أولاً' };
   }
-
   if (!base64Audio || base64Audio.length < 500) {
     return { success: false, error: 'التسجيل الصوتي قصير جداً أو فارغ' };
   }
@@ -354,42 +407,39 @@ ipcMain.handle('transcribe-audio', async (event, { base64Audio, format = 'wav', 
   console.log(`[API] ${mode} mode, model ${model} (Audio bytes: ${base64Audio.length}, format: ${format})...`);
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000); // one budget for all stages
+  const timeoutId = setTimeout(() => controller.abort(), 60000); // long recordings and Pro need more than 15s
 
   try {
-    const transcript = await chat(apiKey, model, [
-      { role: 'system', content: TRANSCRIBE_PROMPT },
-      {
-        role: 'user',
-        content: [
-          { type: 'input_audio', input_audio: { data: base64Audio, format: format === 'mp4' ? 'm4a' : format } },
-          { type: 'text', text: 'Transcribe this recording word for word.' }
-        ]
-      }
-    ], controller.signal);
+    let reply = await generateWithKeys(keys, {
+      model, system: TRANSCRIBE_PROMPT, signal: controller.signal,
+      input: { text: TRANSCRIBE_INSTRUCTION, audio: { data: base64Audio, format } }
+    });
+    // Speech-to-text models misspell English words or write them in Arabic letters; a Gemini text pass fixes only those
+    // (skipped for all-English text: nothing to fix there, and the pass sometimes added الـ to it)
+    if (isOpenRouterStt(model) && /[؀-ۿ]/.test(reply)) {
+      reply = await generateWithKeys(keys, {
+        model: DEFAULT_MODEL, system: FIX_ENGLISH_PROMPT, signal: controller.signal, input: { text: reply }
+      });
+    }
+    const transcript = NOISE_PATTERNS.some(p => p.test(reply)) ? '' : tidyTranscript(reply);
 
-    if (!transcript) {
-      return { success: true, text: '', model, mode };
+    if (!transcript || mode !== 'translate') {
+      return { success: true, text: transcript, model, mode };
     }
 
-    const fixedTranscript = await fixEnglishScript(apiKey, model, transcript, controller.signal);
-
-    if (mode !== 'prompt') {
-      return { success: true, text: fixedTranscript, model, mode };
-    }
-
-    const prompt = await chat(apiKey, model, [
-      { role: 'system', content: AI_PROMPT_PROMPT },
-      { role: 'user', content: fixedTranscript }
-    ], controller.signal);
-
-    return { success: true, text: prompt, model, mode };
+    // Translate the transcript in translate mode using the conversational model
+    const translationModel = isOpenRouterStt(model) ? DEFAULT_MODEL : model;
+    const translation = await generateWithKeys(keys, {
+      model: translationModel, system: translatePrompt(settings.targetLanguage || DEFAULT_SETTINGS.targetLanguage), signal: controller.signal,
+      input: { text: transcript }
+    });
+    return { success: true, text: translation, model, mode };
 
   } catch (err) {
     console.error('[API] Error during transcription:', err.message);
     if (err.apiError) return { success: false, error: err.message };
     if (err.name === 'AbortError') {
-      return { success: false, error: 'استغرق الخادم وقتاً أطول من المتوقع (انتهت المهلة 15 ثانية)' };
+      return { success: false, error: 'استغرق الخادم وقتاً أطول من المتوقع (انتهت المهلة 60 ثانية)' };
     }
     return { success: false, error: `تعذر الاتصال بالخادم: ${err.message}` };
   } finally {
@@ -413,11 +463,20 @@ function createMainWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       backgroundThrottling: false,
-      sandbox: false
+      sandbox: true
     }
   });
 
   mainWindow.loadFile('index.html');
+
+  // Links (e.g. "get your API key") open in the user's browser, not a new app window
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https://')) shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
+  // Nothing in this window should ever navigate away from index.html (dropped file, stray link, etc.)
+  mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
@@ -473,11 +532,12 @@ function createOverlayWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       backgroundThrottling: false,
-      sandbox: false
+      sandbox: true
     }
   });
 
   overlayWindow.loadFile('overlay.html');
+  overlayWindow.webContents.on('will-navigate', (event) => event.preventDefault());
 
   overlayWindow.webContents.session.setPermissionCheckHandler((webContents, permission) => {
     if (permission === 'media' || permission === 'microphone') return true;
@@ -557,7 +617,7 @@ function buildTrayMenu() {
     { label: 'تسجيل (Ctrl + Space)', click: () => toggleOverlay() },
     { type: 'separator' },
     { label: 'تفريغ', type: 'radio', checked: mode === 'default', click: () => setMode('default') },
-    { label: 'AI Prompt', type: 'radio', checked: mode === 'prompt', click: () => setMode('prompt') },
+    { label: 'ترجمة', type: 'radio', checked: mode === 'translate', click: () => setMode('translate') },
     { type: 'separator' },
     { label: 'فتح صوتي', click: showMainWindow },
     { label: 'خروج', click: () => { app.isQuitting = true; app.quit(); } }

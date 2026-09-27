@@ -50,6 +50,18 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0;
+}
+
+/* While a status message shows, it gets the timer + chip space */
+.has-status .timer-text,
+.has-status .mode-chip,
+.has-status #overlay-canvas {
+  display: none;
+}
+
+.has-status .overlay-status {
+  display: block;
 }
 
 .record-indicator {
@@ -130,18 +142,19 @@ body {
   outline-offset: 1px;
 }
 
-/* AI Prompt stands out so it's never mistaken for plain dictation */
-.mode-chip[data-mode="prompt"] {
+/* Translate stands out so it's never mistaken for plain dictation */
+.mode-chip[data-mode="translate"] {
   color: var(--ink);
   background: var(--lavender);
 }
 
-.mode-chip[data-mode="prompt"]:hover:not(:disabled) {
+.mode-chip[data-mode="translate"]:hover:not(:disabled) {
   background: #E6C2FB;
 }
 
 .pill-center {
   flex: 1;
+  min-width: 0;
   height: 28px;
   margin: 0 10px;
   display: flex;
@@ -162,13 +175,18 @@ body {
   font-weight: 600;
   color: var(--cream);
   display: none;
+  max-width: 100%;
   text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pill-right {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .pill-btn {

@@ -17,8 +17,13 @@
     "arabic",
     "english"
   ],
-  "author": "Souty Team",
+  "author": "Tarek Mohammad",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TarekMohammedgg/souty.git"
+  },
+  "homepage": "https://github.com/TarekMohammedgg/souty",
   "devDependencies": {
     "electron": "34.5.8",
     "electron-builder": "^26.15.3"

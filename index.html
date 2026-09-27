@@ -25,7 +25,7 @@
       <div class="header-actions">
         <div class="mode-switch" role="radiogroup" aria-label="طريقة الكتابة">
           <button class="mode-option" role="radio" data-mode="default" title="يكتب كلامك زي ما قلته">تفريغ</button>
-          <button class="mode-option" role="radio" data-mode="prompt" title="يحوّل كلامك لـ prompt إنجليزي واضح للـ AI" dir="ltr">AI Prompt</button>
+          <button class="mode-option" role="radio" data-mode="translate" title="يترجم كلامك للغة اللي اخترتها في الإعدادات، كأن واحد من أهلها كتبه">ترجمة</button>
         </div>
         <span class="hotkey-badge" title="اختصار الشريط العائم في أي مكان بالويندوز">Ctrl + Space</span>
         <button id="btn-settings" class="btn-icon-subtle" title="الإعدادات">
@@ -99,22 +99,53 @@
       </div>
 
       <div class="form-group">
-        <label for="input-api-key">OpenRouter API Key</label>
+        <label for="input-api-key">API Key (OpenRouter أو Google)</label>
         <div class="input-with-button">
-          <input type="password" id="input-api-key" class="form-control" placeholder="sk-or-v1-..." dir="ltr">
+          <input type="password" id="input-api-key" class="form-control" placeholder="sk-or-v1-… أو AIza… أو AQ.…" dir="ltr">
           <button id="btn-toggle-key-visibility" class="btn-secondary btn-key-toggle" type="button" title="إظهار / إخفاء المفتاح">
             <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
           </button>
         </div>
-        <p class="form-hint">احصل على مفتاحك من <a href="#" id="link-openrouter">openrouter.ai/keys</a></p>
+        <p class="form-hint">احصل على مفتاح من <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a> أو <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a></p>
+      </div>
+
+      <div class="form-group">
+        <label>المفاتيح الاحتياطية (Banked API Keys)</label>
+        <button id="btn-open-banked-keys" type="button" class="btn-banked-action">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 2l-2 2m-1.5 1.5L16 7l-2 2m0 0l-1.5 1.5M14 9l2 2m-2-2l-2-2m-3 7a5 5 0 1 1-7-7 5 5 0 0 1 7 7zm0 0l4 4"/>
+          </svg>
+          <span id="btn-banked-text">إدارة المفاتيح</span>
+        </button>
+        <p class="form-hint">مفاتيح بديلة بالترتيب لو المفتاح الأساسي وصل للحد أو وقف عن العمل</p>
       </div>
 
       <div class="form-group">
         <label for="select-model">Model</label>
         <select id="select-model" class="form-control" dir="ltr">
-          <option value="google/gemini-2.5-flash-lite" selected>Gemini 2.5 Flash Lite</option>
-          <option value="google/gemini-2.5-flash">Gemini 2.5 Flash</option>
+          <option value="google/gemini-2.5-flash" selected>Gemini 2.5 Flash</option>
+          <option value="google/gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite</option>
+          <option value="microsoft/mai-transcribe-2">MAI-Transcribe 2</option>
         </select>
+      </div>
+
+      <div class="form-group">
+        <label for="select-target-language">لغة الترجمة</label>
+        <select id="select-target-language" class="form-control">
+          <option value="English">English</option>
+          <option value="Modern Standard Arabic">العربية الفصحى</option>
+          <option value="French">Français</option>
+          <option value="German">Deutsch</option>
+          <option value="Spanish">Español</option>
+          <option value="Italian">Italiano</option>
+          <option value="Portuguese">Português</option>
+          <option value="Turkish">Türkçe</option>
+          <option value="Russian">Русский</option>
+          <option value="Chinese (Simplified)">中文</option>
+          <option value="Japanese">日本語</option>
+          <option value="Korean">한국어</option>
+        </select>
+        <p class="form-hint">في وضع الترجمة، كلامك بيتكتب باللغة دي بصياغة سليمة كأن واحد من أهلها كتبه</p>
       </div>
 
       <div class="form-group form-group-inline">
@@ -124,6 +155,52 @@
 
       <div class="modal-footer">
         <button id="btn-save-settings" class="btn-primary">حفظ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Banked Keys Modal -->
+  <div id="banked-keys-modal" class="modal-overlay modal-nested">
+    <div class="modal-content modal-content-wide">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <h3>المفاتيح الاحتياطية</h3>
+          <span class="modal-subtitle">Banked API Keys</span>
+        </div>
+        <button id="btn-close-banked-keys" class="btn-close-modal" title="إغلاق">&times;</button>
+      </div>
+
+      <p class="modal-description">
+        أضف مفاتيحك البديلة كعناصر مستقلة. في حال واجه المفتاح الأساسي أي خطأ في الحصة (Quota) أو الرصيد، سينتقل صوتي تلقائياً لتجربة هذه المفاتيح بالترتيب.
+      </p>
+
+      <div class="banked-keys-container">
+        <div id="banked-keys-list" class="banked-keys-list">
+          <!-- Populated dynamically via JS -->
+        </div>
+
+        <div id="banked-keys-empty" class="banked-keys-empty" style="display: none;">
+          <div class="empty-icon-wrapper">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+          </div>
+          <p class="empty-title">لا توجد مفاتيح احتياطية حالياً</p>
+          <span class="empty-sub">أضف مفاتيح إضافية من OpenRouter أو Google للتبديل التلقائي</span>
+        </div>
+
+        <button id="btn-add-banked-key" type="button" class="btn-add-key-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span>إضافة مفتاح احتياطي جديد</span>
+        </button>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btn-save-banked-keys" type="button" class="btn-primary">تم وحفظ المفاتيح</button>
       </div>
     </div>
   </div>

@@ -5,6 +5,8 @@
 const COPY_ICON = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
 const CHECK_ICON = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
 const DELETE_ICON = '<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
+// History badges; 'prompt' is the retired AI Prompt mode, kept so old entries still show it
+const MODE_BADGES = { translate: 'ترجمة', prompt: 'AI Prompt' };
 
 document.addEventListener('DOMContentLoaded', async () => {
   const canvas = document.getElementById('visualizer-canvas');
@@ -30,8 +32,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   const inputApiKey = document.getElementById('input-api-key');
   const btnToggleKeyVisibility = document.getElementById('btn-toggle-key-visibility');
   const selectModel = document.getElementById('select-model');
+  const selectTargetLanguage = document.getElementById('select-target-language');
   const checkAutoCopy = document.getElementById('check-auto-copy');
-  const linkOpenrouter = document.getElementById('link-openrouter');
+
+  // Banked Keys elements
+  const bankedKeysModal = document.getElementById('banked-keys-modal');
+  const btnOpenBankedKeys = document.getElementById('btn-open-banked-keys');
+  const btnCloseBankedKeys = document.getElementById('btn-close-banked-keys');
+  const btnSaveBankedKeys = document.getElementById('btn-save-banked-keys');
+  const btnAddBankedKey = document.getElementById('btn-add-banked-key');
+  const bankedKeysListEl = document.getElementById('banked-keys-list');
+  const bankedKeysEmptyEl = document.getElementById('banked-keys-empty');
+  const btnBankedText = document.getElementById('btn-banked-text');
+  let bankedKeysList = [];
 
   const toastContainer = document.getElementById('toast-container');
   const modeOptions = document.querySelectorAll('.mode-option');
@@ -68,7 +81,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // =========================================================================
-  // Mode: default transcription or AI prompt
+  // Mode: default transcription or translation
   // =========================================================================
 
   function applyMode(mode) {
@@ -109,7 +122,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function startRecording() {
     if (!currentSettings.apiKey) {
-      showToast('أضف مفتاح OpenRouter من الإعدادات أولاً', 'error');
+      showToast('أضف مفتاح API من الإعدادات أولاً', 'error');
       openSettingsModal();
       return;
     }
@@ -133,7 +146,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
 
-      setProcessingUI(true, currentSettings.mode === 'prompt' ? 'جاري كتابة الـ prompt...' : 'جاري التفريغ...');
+      setProcessingUI(true, currentSettings.mode === 'translate' ? 'جاري الترجمة...' : 'جاري التفريغ...');
 
       const response = await window.electronAPI.transcribeAudio({
         base64Audio: result.base64,
@@ -155,7 +168,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       await window.electronAPI.history.add({ duration: result.duration, text, mode: response.mode }); // list re-renders on history-changed
 
       if (currentSettings.autoCopy) {
-        await navigator.clipboard.writeText(text);
+        await window.electronAPI.copyText(text);
         showToast('تم التفريغ والنسخ', 'success');
       } else {
         showToast('تم التفريغ', 'success');
@@ -255,10 +268,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const meta = document.createElement('div');
     meta.className = 'history-item-meta';
     meta.append(time);
-    if (item.mode === 'prompt') {
+    if (MODE_BADGES[item.mode]) {
       const badge = document.createElement('span');
       badge.className = 'history-item-badge';
-      badge.textContent = 'AI Prompt';
+      badge.textContent = MODE_BADGES[item.mode];
       meta.append(badge);
     }
 
@@ -276,7 +289,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnCopy.setAttribute('aria-label', 'نسخ');
     btnCopy.innerHTML = COPY_ICON;
     btnCopy.addEventListener('click', async () => {
-      await navigator.clipboard.writeText(item.text);
+      await window.electronAPI.copyText(item.text);
       btnCopy.innerHTML = CHECK_ICON;
       btnCopy.classList.add('copied');
       setTimeout(() => {
@@ -303,13 +316,161 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // =========================================================================
-  // Settings
-  // =========================================================================
+  // OpenRouter or Google AI Studio (old AIza… or new AQ.… keys); main.js picks the provider from the prefix
+  const KEY_PATTERN = /^(sk-or-|AIza|AQ\.)/;
+
+  const AVAILABLE_MODELS = [
+    { id: 'google/gemini-2.5-flash', name: 'Gemini 2.5 Flash', providers: ['google', 'openrouter'] },
+    { id: 'google/gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash-Lite', providers: ['google', 'openrouter'] },
+    { id: 'microsoft/mai-transcribe-2', name: 'MAI-Transcribe 2', providers: ['openrouter'] }
+  ];
+
+  function getProviderInfo(key) {
+    const trimmed = (key || '').trim();
+    if (trimmed.startsWith('sk-or-')) return { name: 'OpenRouter', className: 'openrouter' };
+    if (/^(AIza|AQ\.)/.test(trimmed)) return { name: 'Google AI', className: 'google' };
+    if (!trimmed) return { name: 'فارغ', className: 'unknown' };
+    return { name: 'غير معروف', className: 'unknown' };
+  }
+
+  function updateModelOptions(key, preferredModel) {
+    const prov = getProviderInfo(key);
+    // When the primary key is Google, show only Google-supported models; otherwise OpenRouter-supported models
+    const targetProvider = prov.className === 'google' ? 'google' : 'openrouter';
+    const currentSelection = preferredModel !== undefined ? preferredModel : selectModel.value;
+
+    const filteredModels = AVAILABLE_MODELS.filter(m => m.providers.includes(targetProvider));
+
+    selectModel.innerHTML = '';
+    filteredModels.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = m.name;
+      selectModel.appendChild(opt);
+    });
+
+    if (filteredModels.some(m => m.id === currentSelection)) {
+      selectModel.value = currentSelection;
+    } else {
+      selectModel.value = filteredModels[0].id;
+    }
+  }
+
+  function updateBankedKeysSummary() {
+    const count = (bankedKeysList || []).filter(k => k && k.trim()).length;
+    if (btnBankedText) {
+      btnBankedText.textContent = count > 0 ? `إدارة المفاتيح (${count})` : 'إدارة المفاتيح';
+    }
+  }
+
+  function renderBankedKeys() {
+    bankedKeysListEl.innerHTML = '';
+    if (bankedKeysList.length === 0) {
+      bankedKeysEmptyEl.style.display = 'flex';
+    } else {
+      bankedKeysEmptyEl.style.display = 'none';
+      bankedKeysList.forEach((key, index) => {
+        const item = document.createElement('div');
+        item.className = 'banked-key-item';
+
+        const priorityBadge = document.createElement('span');
+        priorityBadge.className = 'key-item-priority';
+        priorityBadge.textContent = `#${index + 1}`;
+
+        const inputWrapper = document.createElement('div');
+        inputWrapper.className = 'key-item-input-wrapper';
+
+        const input = document.createElement('input');
+        input.type = 'password';
+        input.className = 'key-item-input';
+        input.value = key;
+        input.placeholder = 'sk-or-v1-… أو AIza… أو AQ.…';
+        input.spellcheck = false;
+        input.dir = 'ltr';
+
+        const providerPill = document.createElement('span');
+        const prov = getProviderInfo(key);
+        providerPill.className = `provider-pill ${prov.className}`;
+        providerPill.textContent = prov.name;
+
+        input.addEventListener('input', () => {
+          bankedKeysList[index] = input.value;
+          const p = getProviderInfo(input.value);
+          providerPill.className = `provider-pill ${p.className}`;
+          providerPill.textContent = p.name;
+        });
+
+        inputWrapper.append(input, providerPill);
+
+        const btnToggleVisibility = document.createElement('button');
+        btnToggleVisibility.type = 'button';
+        btnToggleVisibility.className = 'key-item-btn';
+        btnToggleVisibility.title = 'إظهار / إخفاء المفتاح';
+        btnToggleVisibility.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+        btnToggleVisibility.addEventListener('click', () => {
+          input.type = input.type === 'password' ? 'text' : 'password';
+        });
+
+        const btnDelete = document.createElement('button');
+        btnDelete.type = 'button';
+        btnDelete.className = 'key-item-btn key-item-btn-delete';
+        btnDelete.title = 'حذف المفتاح';
+        btnDelete.innerHTML = DELETE_ICON;
+        btnDelete.addEventListener('click', () => {
+          bankedKeysList.splice(index, 1);
+          renderBankedKeys();
+          updateBankedKeysSummary();
+        });
+
+        item.append(priorityBadge, inputWrapper, btnToggleVisibility, btnDelete);
+        bankedKeysListEl.append(item);
+      });
+    }
+  }
+
+  function openBankedKeysModal() {
+    renderBankedKeys();
+    bankedKeysModal.classList.add('active');
+  }
+
+  function closeBankedKeysModal() {
+    bankedKeysModal.classList.remove('active');
+  }
+
+  btnOpenBankedKeys.addEventListener('click', openBankedKeysModal);
+  btnCloseBankedKeys.addEventListener('click', closeBankedKeysModal);
+  bankedKeysModal.addEventListener('click', (e) => {
+    if (e.target === bankedKeysModal) closeBankedKeysModal();
+  });
+
+  btnAddBankedKey.addEventListener('click', () => {
+    bankedKeysList.push('');
+    renderBankedKeys();
+    const inputs = bankedKeysListEl.querySelectorAll('.key-item-input');
+    if (inputs.length > 0) {
+      inputs[inputs.length - 1].focus();
+    }
+  });
+
+  btnSaveBankedKeys.addEventListener('click', () => {
+    const cleaned = bankedKeysList.map(k => k.trim()).filter(Boolean);
+    const badKeyIndex = cleaned.findIndex(k => !KEY_PATTERN.test(k));
+    if (badKeyIndex !== -1) {
+      showToast(`المفتاح الاحتياطي رقم ${badKeyIndex + 1} مش مفتاح OpenRouter أو Google صحيح`, 'error', 4000);
+      return;
+    }
+    bankedKeysList = [...new Set(cleaned)];
+    updateBankedKeysSummary();
+    closeBankedKeysModal();
+    showToast('تم تحديث قائمة المفاتيح الاحتياطية', 'info');
+  });
 
   function openSettingsModal() {
     inputApiKey.value = currentSettings.apiKey || '';
-    selectModel.value = currentSettings.model || 'google/gemini-2.5-flash-lite';
+    bankedKeysList = [...(currentSettings.bankedKeys || [])];
+    updateBankedKeysSummary();
+    updateModelOptions(inputApiKey.value, currentSettings.model);
+    selectTargetLanguage.value = currentSettings.targetLanguage || 'English';
     checkAutoCopy.checked = currentSettings.autoCopy !== false;
     settingsModal.classList.add('active');
   }
@@ -324,19 +485,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.target === settingsModal) closeSettingsModal();
   });
 
+  inputApiKey.addEventListener('input', () => {
+    updateModelOptions(inputApiKey.value);
+  });
+
   btnToggleKeyVisibility.addEventListener('click', () => {
     inputApiKey.type = inputApiKey.type === 'password' ? 'text' : 'password';
   });
 
-  linkOpenrouter.addEventListener('click', (e) => {
-    e.preventDefault();
-    window.open('https://openrouter.ai/keys', '_blank');
-  });
-
   btnSaveSettings.addEventListener('click', async () => {
+    const apiKey = inputApiKey.value.trim();
+    if (apiKey && !KEY_PATTERN.test(apiKey)) {
+      showToast('المفتاح لازم يكون من OpenRouter (sk-or-…) أو Google AI Studio (AIza… أو AQ.…)', 'error', 4000);
+      return;
+    }
+
+    const prov = getProviderInfo(apiKey);
+    const chosenModel = AVAILABLE_MODELS.find(m => m.id === selectModel.value);
+    if (prov.className === 'google' && chosenModel && !chosenModel.providers.includes('google')) {
+      showToast('الموديل المختار غير مدعوم عبر مفتاح Google', 'error', 4500);
+      return;
+    }
+
+    const cleanedBanked = bankedKeysList.map(k => k.trim()).filter(Boolean);
+    const badLine = cleanedBanked.findIndex(k => !KEY_PATTERN.test(k));
+    if (badLine !== -1) {
+      showToast(`المفتاح الاحتياطي رقم ${badLine + 1} مش مفتاح OpenRouter أو Google صحيح`, 'error', 4000);
+      return;
+    }
+
     currentSettings = await window.electronAPI.saveSettings({
-      apiKey: inputApiKey.value.trim(),
+      apiKey,
+      bankedKeys: [...new Set(cleanedBanked)].filter(k => k !== apiKey),
       model: selectModel.value,
+      targetLanguage: selectTargetLanguage.value,
       autoCopy: checkAutoCopy.checked
     });
     closeSettingsModal();
@@ -348,13 +530,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   // =========================================================================
 
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && settingsModal.classList.contains('active')) {
-      closeSettingsModal();
-      return;
+    if (e.key === 'Escape') {
+      if (bankedKeysModal.classList.contains('active')) {
+        closeBankedKeysModal();
+        return;
+      }
+      if (settingsModal.classList.contains('active')) {
+        closeSettingsModal();
+        return;
+      }
     }
     const el = document.activeElement;
     const isEditing = el && ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(el.tagName);
-    if (e.code === 'Space' && !isEditing && !settingsModal.classList.contains('active')) {
+    if (e.code === 'Space' && !isEditing && !settingsModal.classList.contains('active') && !bankedKeysModal.classList.contains('active')) {
       e.preventDefault();
       btnRecordToggle.click();
     }
