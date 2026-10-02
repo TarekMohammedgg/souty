@@ -25,7 +25,7 @@ Output only the transcript.`;
 // Sent with the audio. Google's suggested "Generate a transcript of the speech." scored 46% vs 73% for this one.
 const TRANSCRIBE_INSTRUCTION = 'Transcribe this recording.';
 
-// Speech-to-text models only (MAI-Transcribe): text pass that fixes English words the model misspelled or wrote
+// Runs after every transcription that contains Arabic: text pass that fixes English words the model misspelled or wrote
 // in Arabic letters. Eval: English terms 37% → 65%, invented words 21 → 16. "Never add a prefix" stops it adding الـ
 // to fully English sentences.
 const FIX_ENGLISH_PROMPT = `You correct a speech-to-text transcript of Egyptian Arabic mixed with English.

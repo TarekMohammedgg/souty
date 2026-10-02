@@ -1,7 +1,7 @@
 {
   "name": "souty-audio-transcriber",
   "productName": "Souty",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Voice-first writing for Windows: speak in Arabic or English and Souty types it wherever your cursor is.",
   "main": "main.js",
   "scripts": {

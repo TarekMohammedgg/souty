@@ -414,9 +414,9 @@ ipcMain.handle('transcribe-audio', async (event, { base64Audio, format = 'wav', 
       model, system: TRANSCRIBE_PROMPT, signal: controller.signal,
       input: { text: TRANSCRIBE_INSTRUCTION, audio: { data: base64Audio, format } }
     });
-    // Speech-to-text models misspell English words or write them in Arabic letters; a Gemini text pass fixes only those
-    // (skipped for all-English text: nothing to fix there, and the pass sometimes added الـ to it)
-    if (isOpenRouterStt(model) && /[؀-ۿ]/.test(reply)) {
+    // Every model (Gemini too, ~1 in 4 terms even at its best) misspells English words or writes them in Arabic letters;
+    // a Gemini text pass fixes only those (skipped for all-English text: nothing to fix there, and the pass sometimes added الـ to it)
+    if (/[؀-ۿ]/.test(reply)) {
       reply = await generateWithKeys(keys, {
         model: DEFAULT_MODEL, system: FIX_ENGLISH_PROMPT, signal: controller.signal, input: { text: reply }
       });

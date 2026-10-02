@@ -5,7 +5,7 @@
 
   **Voice-first writing for Windows — speak Arabic or English, text appears where your cursor is**
 
-  [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](package.json)
+  [![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)](package.json)
   [![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](#)
   [![Electron](https://img.shields.io/badge/Electron-34-47848F?logo=electron)](https://electronjs.org)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -75,7 +75,7 @@ You need an API key from either provider:
 
 ### Install (recommended)
 
-Download `Souty-Setup-1.0.0.exe` from [Releases](https://github.com/TarekMohammedgg/souty/releases) and run it.
+Download `Souty-Setup-1.0.1.exe` from [Releases](https://github.com/TarekMohammedgg/souty/releases) and run it.
 
 The installer isn't code-signed, so Windows SmartScreen will show "Windows protected your PC". Click **More info → Run anyway**. This is expected for an independently published app without a paid signing certificate.
 
@@ -103,7 +103,7 @@ npm run dev
 
 ```bash
 npm run dist
-# Output: dist/Souty-Setup-1.0.0.exe
+# Output: dist/Souty-Setup-1.0.1.exe
 ```
 
 ---
