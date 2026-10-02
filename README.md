@@ -11,7 +11,7 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 </div>
 
-https://github.com/user-attachments/assets/2f095a5d-b1cd-4da1-b76a-77f55cdce375
+https://github.com/user-attachments/assets/b27a397a-3494-4948-a14a-688ab7280e49
 
 ---
 
