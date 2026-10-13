@@ -38,7 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   let isProcessing = false;
-  let safetyTimeout = null;
   let currentMode = 'default';
   let targetLanguage = 'English';
 
@@ -73,7 +72,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function startRecording() {
     if (isProcessing) return;
-    clearTimeout(safetyTimeout);
 
     const settings = await window.overlayAPI.getSettings();
     targetLanguage = settings.targetLanguage || 'English';
@@ -114,15 +112,6 @@ document.addEventListener('DOMContentLoaded', () => {
     modeChip.disabled = true;
     recordIndicator.className = 'record-indicator processing';
     showStatus(currentMode === 'translate' ? 'جاري الترجمة...' : 'جاري التفريغ...');
-
-    safetyTimeout = setTimeout(() => {
-      if (isProcessing) {
-        isProcessing = false;
-        recordIndicator.className = 'record-indicator';
-        showStatus('انتهت المهلة، حاول تاني');
-        hideLater(2000);
-      }
-    }, 16000);
 
     try {
       const result = await audioRecorder.stop();
@@ -168,7 +157,6 @@ document.addEventListener('DOMContentLoaded', () => {
       showStatus((err.message || 'خطأ بالتفريغ').slice(0, 40));
       hideLater(2500);
     } finally {
-      clearTimeout(safetyTimeout);
       isProcessing = false;
     }
   }
@@ -181,7 +169,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function cancelRecording() {
     if (isProcessing) return;
-    clearTimeout(safetyTimeout);
     audioRecorder.cancel();
     window.overlayAPI.hideOverlay();
   }

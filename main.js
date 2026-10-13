@@ -406,19 +406,16 @@ ipcMain.handle('transcribe-audio', async (event, { base64Audio, format = 'wav', 
 
   console.log(`[API] ${mode} mode, model ${model} (Audio bytes: ${base64Audio.length}, format: ${format})...`);
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 60000); // long recordings and Pro need more than 15s
-
   try {
     let reply = await generateWithKeys(keys, {
-      model, system: TRANSCRIBE_PROMPT, signal: controller.signal,
+      model, system: TRANSCRIBE_PROMPT,
       input: { text: TRANSCRIBE_INSTRUCTION, audio: { data: base64Audio, format } }
     });
     // Every model (Gemini too, ~1 in 4 terms even at its best) misspells English words or writes them in Arabic letters;
     // a Gemini text pass fixes only those (skipped for all-English text: nothing to fix there, and the pass sometimes added الـ to it)
     if (/[؀-ۿ]/.test(reply)) {
       reply = await generateWithKeys(keys, {
-        model: DEFAULT_MODEL, system: FIX_ENGLISH_PROMPT, signal: controller.signal, input: { text: reply }
+        model: DEFAULT_MODEL, system: FIX_ENGLISH_PROMPT, input: { text: reply }
       });
     }
     const transcript = NOISE_PATTERNS.some(p => p.test(reply)) ? '' : tidyTranscript(reply);
@@ -430,7 +427,7 @@ ipcMain.handle('transcribe-audio', async (event, { base64Audio, format = 'wav', 
     // Translate the transcript in translate mode using the conversational model
     const translationModel = isOpenRouterStt(model) ? DEFAULT_MODEL : model;
     const translation = await generateWithKeys(keys, {
-      model: translationModel, system: translatePrompt(settings.targetLanguage || DEFAULT_SETTINGS.targetLanguage), signal: controller.signal,
+      model: translationModel, system: translatePrompt(settings.targetLanguage || DEFAULT_SETTINGS.targetLanguage),
       input: { text: transcript }
     });
     return { success: true, text: translation, model, mode };
@@ -438,12 +435,7 @@ ipcMain.handle('transcribe-audio', async (event, { base64Audio, format = 'wav', 
   } catch (err) {
     console.error('[API] Error during transcription:', err.message);
     if (err.apiError) return { success: false, error: err.message };
-    if (err.name === 'AbortError') {
-      return { success: false, error: 'استغرق الخادم وقتاً أطول من المتوقع (انتهت المهلة 60 ثانية)' };
-    }
     return { success: false, error: `تعذر الاتصال بالخادم: ${err.message}` };
-  } finally {
-    clearTimeout(timeoutId);
   }
 });
 
