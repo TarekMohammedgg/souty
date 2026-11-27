@@ -42,8 +42,11 @@ const DEFAULT_SETTINGS = {
   model: 'google/gemini-2.5-flash',
   autoCopy: true,
   mode: 'default',
-  targetLanguage: 'English'
+  targetLanguage: 'English',
+  micDeviceId: '', // '' = Windows default input
+  launchWithApp: '' // exe name, e.g. "T3 Code (Beta).exe"; '' = off
 };
+const EXE_NAME = /^[^\\/:*?"<>|]+\.exe$/i;
 
 // API keys are encrypted at rest with Windows DPAPI (safeStorage) under *Enc fields; decrypted only in memory.
 // Falls back to plain text when encryption isn't available (e.g. no login keyring) so a key is never lost.
@@ -64,6 +67,7 @@ function readSettings() {
       delete settings.bankedKeysEnc;
       if (!MODES.includes(settings.mode)) settings.mode = 'default';
       if (!MODELS.includes(settings.model)) settings.model = MODELS[0];
+      if (!EXE_NAME.test(settings.launchWithApp || '')) settings.launchWithApp = '';
       return settings;
     }
   } catch (e) {
@@ -232,8 +236,55 @@ ipcMain.handle('get-app-settings', () => readSettings());
 ipcMain.handle('save-app-settings', (event, newSettings) => {
   const updated = writeSettings(newSettings);
   buildTrayMenu();
+  applyLaunchWithApp();
   return updated;
 });
+
+// Apps with a window right now, for the "open Souty with" picker: [{ exe, label }]
+ipcMain.handle('list-window-apps', () => new Promise((resolve) => {
+  // Skips Windows' own processes (Explorer, Settings…: they run from C:\Windows) and helpers with no app name (touch keyboard…)
+  const ps = "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Process | ? { $_.MainWindowHandle -ne 0 -and $_.Description -and $_.Path -notlike \"$env:windir*\" } | Sort-Object Description | % { $_.ProcessName + '|' + $_.Description }";
+  execFile('powershell.exe', ['-NoProfile', '-Command', ps], { windowsHide: true }, (err, out) => {
+    if (err) return resolve([]);
+    const apps = new Map();
+    for (const line of out.split(/\r?\n/).filter(Boolean)) {
+      const [name, description] = line.split('|');
+      if (name !== 'Souty') apps.set(`${name}.exe`, description || name);
+    }
+    resolve([...apps].map(([exe, label]) => ({ exe, label })));
+  });
+}));
+
+// "Open Souty with an app": Souty starts with Windows, hidden in the tray, and shows its window when that app starts.
+// ponytail: polls tasklist every 3s (~30ms each); a WMI process-start event would be instant but needs admin.
+let launchWatchTimer = null;
+function isProcessRunning(exe) {
+  return new Promise((resolve) => {
+    execFile('tasklist', ['/fi', `imagename eq ${exe}`, '/fo', 'csv', '/nh'], { windowsHide: true }, (err, out) => {
+      resolve(!err && out.toLowerCase().includes(`"${exe.toLowerCase()}"`));
+    });
+  });
+}
+
+function applyLaunchWithApp() {
+  const exe = readSettings().launchWithApp;
+  clearInterval(launchWatchTimer);
+  launchWatchTimer = null;
+  // Packaged only: in dev this would register electron.exe to run at login
+  if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: !!exe, args: ['--hidden'] });
+  if (!exe) return;
+  // The app being open already when this starts doesn't count as "it just opened"
+  let wasRunning = true;
+  isProcessRunning(exe).then((running) => { wasRunning = running; });
+  launchWatchTimer = setInterval(async () => {
+    const running = await isProcessRunning(exe);
+    if (running && !wasRunning && mainWindow && !mainWindow.isVisible()) {
+      console.log(`[LAUNCH-WITH] ${exe} started, showing Souty`);
+      mainWindow.showInactive(); // visible, but the app the user just opened keeps the keyboard
+    }
+    wasRunning = running;
+  }, 3000);
+}
 
 function setMode(mode) {
   if (!MODES.includes(mode)) return;
@@ -470,8 +521,9 @@ function createMainWindow() {
   // Nothing in this window should ever navigate away from index.html (dropped file, stray link, etc.)
   mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
 
+  // --hidden: started with Windows for "open Souty with an app", so stay in the tray until that app opens
   mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
+    if (!process.argv.includes('--hidden')) mainWindow.show();
   });
 
   // When clicking close button (X), hide to Tray instead of quitting
@@ -661,6 +713,7 @@ app.whenReady().then(() => {
   createMainWindow();
   createOverlayWindow();
   createTray();
+  applyLaunchWithApp();
 
   // Start native driver-level hook for Ctrl + Space (bypasses Windows IME & works everywhere)
   startHotkeyHook();

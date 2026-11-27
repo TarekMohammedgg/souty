@@ -40,20 +40,23 @@ class AudioRecorder {
     setTimeout(resize, 50);
   }
 
-  async start() {
+  // micDeviceId: the mic chosen in settings ('' = Windows default input)
+  async start(micDeviceId = '') {
     if (this.state === 'recording') return;
 
     try {
       // 1. Microphone access with noise suppression
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        },
-        video: false
-      });
+      const audio = { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+      try {
+        this.stream = await navigator.mediaDevices.getUserMedia({
+          audio: micDeviceId ? { ...audio, deviceId: { exact: micDeviceId } } : audio
+        });
+      } catch (err) {
+        if (!micDeviceId) throw err;
+        // The chosen headset is unplugged: record from the default mic instead of failing
+        console.warn('Chosen mic unavailable, using the default one:', err.name);
+        this.stream = await navigator.mediaDevices.getUserMedia({ audio });
+      }
 
       // 2. AudioContext & Analyser for Live Waveform
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;

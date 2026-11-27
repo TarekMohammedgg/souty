@@ -13,7 +13,14 @@ const cases = [
   ['الـ dashboard والكونتينر', 'الـ dashboard والكونتينر'],
   ['علىdeploy', 'علىdeploy'],
   ['The build is failing', 'The build is failing'],
-  ['("الlink")', '("الـ link")']
+  ['("الlink")', '("الـ link")'],
+  // hesitation sounds and a stuttered prefix go; real short words stay
+  ['عشان هو ياخد ااا الصوت', 'عشان هو ياخد الصوت'],
+  ['إعدادات الـ الـ الـ desktop application', 'إعدادات الـ desktop application'],
+  ['فعايز أتأكد ااا، إن هو امم شغال', 'فعايز أتأكد إن هو شغال'],
+  ['ااا أنا عايز uh the build, um, is failing', 'أنا عايز the build, is failing'],
+  ['اه طبعا، ام محمد', 'اه طبعا، ام محمد'],
+  ['ممكن تشوف الـ hummus', 'ممكن تشوف الـ hummus']
 ];
 for (const [input, expected] of cases) assert.equal(tidyTranscript(input), expected, input);
 console.log(`tidyTranscript: ${cases.length} cases passed`);

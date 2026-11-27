@@ -92,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
     modeChip.disabled = false;
 
     try {
-      await audioRecorder.start();
+      await audioRecorder.start(settings.micDeviceId);
     } catch (err) {
       console.error('Failed to start overlay recording:', err);
       showStatus('تعذر تشغيل المايكروفون');

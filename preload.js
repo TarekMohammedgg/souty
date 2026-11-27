@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   copyText: (text) => ipcRenderer.invoke('copy-text', text),
   getSettings: () => ipcRenderer.invoke('get-app-settings'),
   saveSettings: (settings) => ipcRenderer.invoke('save-app-settings', settings),
+  listWindowApps: () => ipcRenderer.invoke('list-window-apps'),
   onSettingsChanged: (callback) => {
     ipcRenderer.on('settings-changed', (_event, settings) => callback(settings));
   },

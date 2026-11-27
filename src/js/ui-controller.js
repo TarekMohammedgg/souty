@@ -34,6 +34,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const selectModel = document.getElementById('select-model');
   const selectTargetLanguage = document.getElementById('select-target-language');
   const checkAutoCopy = document.getElementById('check-auto-copy');
+  const selectMic = document.getElementById('select-mic');
+  const selectLaunchApp = document.getElementById('select-launch-app');
 
   // Banked Keys elements
   const bankedKeysModal = document.getElementById('banked-keys-modal');
@@ -127,7 +129,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     try {
-      await audioRecorder.start();
+      await audioRecorder.start(currentSettings.micDeviceId);
     } catch (err) {
       console.error(err);
       showToast('تعذر الوصول للمايكروفون. تأكد من توصيله وإعطاء الصلاحية.', 'error', 4000);
@@ -472,7 +474,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateModelOptions(inputApiKey.value, currentSettings.model);
     selectTargetLanguage.value = currentSettings.targetLanguage || 'English';
     checkAutoCopy.checked = currentSettings.autoCopy !== false;
+    fillMicOptions(currentSettings.micDeviceId || '');
+    fillLaunchAppOptions(currentSettings.launchWithApp || '');
     settingsModal.classList.add('active');
+  }
+
+  // "Off" + the saved app right away; the open apps arrive ~1s later (PowerShell)
+  async function fillLaunchAppOptions(savedExe) {
+    selectLaunchApp.length = 1; // keep "off"
+    if (savedExe) selectLaunchApp.add(new Option(savedExe.replace(/\.exe$/i, ''), savedExe));
+    selectLaunchApp.value = savedExe;
+    const apps = await window.electronAPI.listWindowApps();
+    for (const { exe, label } of apps) {
+      if (exe === savedExe) selectLaunchApp.options[1].text = label;
+      else selectLaunchApp.add(new Option(label, exe));
+    }
+  }
+
+  // Lists the plugged-in mics each time settings open, so a headset connected later shows up
+  async function fillMicOptions(selectedId) {
+    const mics = (await navigator.mediaDevices.enumerateDevices())
+      .filter(d => d.kind === 'audioinput' && d.deviceId !== 'default' && d.deviceId !== 'communications');
+    selectMic.length = 1; // keep "Windows default"
+    mics.forEach((m, i) => selectMic.add(new Option(m.label || `Microphone ${i + 1}`, m.deviceId)));
+    selectMic.value = mics.some(m => m.deviceId === selectedId) ? selectedId : '';
   }
 
   function closeSettingsModal() {
@@ -519,7 +544,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       bankedKeys: [...new Set(cleanedBanked)].filter(k => k !== apiKey),
       model: selectModel.value,
       targetLanguage: selectTargetLanguage.value,
-      autoCopy: checkAutoCopy.checked
+      autoCopy: checkAutoCopy.checked,
+      micDeviceId: selectMic.value,
+      launchWithApp: selectLaunchApp.value
     });
     closeSettingsModal();
     showToast('تم حفظ الإعدادات', 'success');
