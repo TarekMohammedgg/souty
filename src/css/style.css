@@ -572,8 +572,20 @@ kbd {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  max-height: calc(100vh - 48px); /* never taller than the window: title and Save stay on screen */
   transform: translateY(15px);
   transition: transform 0.25s ease;
+}
+
+/* The fields between the title and Save scroll when the window is short */
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 0;
+  overflow-y: auto;
+  margin-inline: -6px;
+  padding-inline: 6px;
 }
 
 .modal-overlay.active .modal-content {
