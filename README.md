@@ -5,7 +5,7 @@
 
   **Voice-first writing for Windows — speak Arabic or English, text appears where your cursor is**
 
-  [![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](package.json)
+  [![Version](https://img.shields.io/badge/version-1.1.1-blue.svg)](package.json)
   [![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](#)
   [![Electron](https://img.shields.io/badge/Electron-34-47848F?logo=electron)](https://electronjs.org)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -32,7 +32,7 @@ Press **`Ctrl + Space`** from anywhere on Windows — a floating pill appears, y
 | **Multiple models** | Gemini 2.5 Flash, Gemini 3.1 Flash-Lite, or MAI-Transcribe 2 (speech-to-text only, via OpenRouter) |
 | **Translate mode** | Speak Arabic, receive polished English (or any target language) |
 | **Key fallback** | Bank backup API keys; a quota or auth error on one key automatically tries the next |
-| **System tray** | Runs silently in the tray; right-click to switch modes or start recording |
+| **System tray** | Starts in the tray (no window) so `Ctrl + Space` is ready; click the tray icon to open Souty, right-click to switch modes or start recording |
 | **History** | Keeps the last 200 recordings locally with timestamps and duration |
 | **High-quality audio** | 16 kHz mono PCM WAV — no WebM compression, best input for AI transcription |
 | **Microphone choice** | Pick your headset mic in settings; falls back to the Windows default if it's unplugged |
@@ -78,7 +78,7 @@ You need an API key from either provider:
 
 ### Install (recommended)
 
-Download `Souty-Setup-1.1.0.exe` from [Releases](https://github.com/TarekMohammedgg/souty/releases) and run it.
+Download `Souty-Setup-1.1.1.exe` from [Releases](https://github.com/TarekMohammedgg/souty/releases) and run it.
 
 The installer isn't code-signed, so Windows SmartScreen will show "Windows protected your PC". Click **More info → Run anyway**. This is expected for an independently published app without a paid signing certificate.
 
@@ -106,7 +106,7 @@ npm run dev
 
 ```bash
 npm run dist
-# Output: dist/Souty-Setup-1.1.0.exe
+# Output: dist/Souty-Setup-1.1.1.exe
 ```
 
 ---

@@ -271,7 +271,7 @@ function applyLaunchWithApp() {
   clearInterval(launchWatchTimer);
   launchWatchTimer = null;
   // Packaged only: in dev this would register electron.exe to run at login
-  if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: !!exe, args: ['--hidden'] });
+  if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: !!exe });
   if (!exe) return;
   // The app being open already when this starts doesn't count as "it just opened"
   let wasRunning = true;
@@ -521,9 +521,10 @@ function createMainWindow() {
   // Nothing in this window should ever navigate away from index.html (dropped file, stray link, etc.)
   mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
 
-  // --hidden: started with Windows for "open Souty with an app", so stay in the tray until that app opens
+  // Souty starts in the tray: Ctrl+Space works right away, the window opens from the tray or a second launch.
+  // Exception: no API key yet (first run), since nothing works until one is pasted in settings.
   mainWindow.once('ready-to-show', () => {
-    if (!process.argv.includes('--hidden')) mainWindow.show();
+    if (!readSettings().apiKey) mainWindow.show();
   });
 
   // When clicking close button (X), hide to Tray instead of quitting
