@@ -5,7 +5,7 @@
 
   **Voice-first writing for Windows — speak Arabic or English, text appears where your cursor is**
 
-  [![Version](https://img.shields.io/badge/version-1.0.2-blue.svg)](package.json)
+  [![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](package.json)
   [![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](#)
   [![Electron](https://img.shields.io/badge/Electron-34-47848F?logo=electron)](https://electronjs.org)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -35,6 +35,9 @@ Press **`Ctrl + Space`** from anywhere on Windows — a floating pill appears, y
 | **System tray** | Runs silently in the tray; right-click to switch modes or start recording |
 | **History** | Keeps the last 200 recordings locally with timestamps and duration |
 | **High-quality audio** | 16 kHz mono PCM WAV — no WebM compression, best input for AI transcription |
+| **Microphone choice** | Pick your headset mic in settings; falls back to the Windows default if it's unplugged |
+| **Clean transcripts** | Hesitation sounds ("ااا", "امم", "uh") and a stuttered "الـ الـ" are removed from the text |
+| **Open with an app** | Optional: Souty starts with Windows in the tray and opens when a chosen app (e.g. T3 Code) opens |
 
 ---
 
@@ -75,7 +78,7 @@ You need an API key from either provider:
 
 ### Install (recommended)
 
-Download `Souty-Setup-1.0.2.exe` from [Releases](https://github.com/TarekMohammedgg/souty/releases) and run it.
+Download `Souty-Setup-1.1.0.exe` from [Releases](https://github.com/TarekMohammedgg/souty/releases) and run it.
 
 The installer isn't code-signed, so Windows SmartScreen will show "Windows protected your PC". Click **More info → Run anyway**. This is expected for an independently published app without a paid signing certificate.
 
@@ -103,7 +106,7 @@ npm run dev
 
 ```bash
 npm run dist
-# Output: dist/Souty-Setup-1.0.2.exe
+# Output: dist/Souty-Setup-1.1.0.exe
 ```
 
 ---
@@ -141,6 +144,8 @@ Settings are stored in `%APPDATA%\souty-audio-transcriber\settings.json`. API ke
 | `mode` | `default` | `default` (transcribe) or `translate` |
 | `targetLanguage` | `English` | Language for Translate mode output |
 | `autoCopy` | `true` | Copy result to clipboard in addition to auto-paste |
+| `micDeviceId` | _(empty)_ | Microphone to record from; empty = Windows default |
+| `launchWithApp` | _(empty)_ | App to open Souty with, e.g. `T3 Code (Beta).exe`; empty = off |
 
 ---
 
